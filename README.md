@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/e7e6bb47-f06e-4f31-8c75-cd8203654db1
 * **Chapter Browser:** Quickly navigate across Physics, Chemistry, and Mathematics chapters straight from the terminal.
 * **Keyboard-First TUI:** Built with clean terminal navigation (`Up/Down` arrows, `/` to jump search, `Enter` to open, `q` to quit).
 
-## Quick Start (Linux / Debian / Ubuntu)
+## Quick Start (Linux / GNU)
 
 After downloading the repository ZIP to your `Downloads` folder, run the following commands in your terminal:
 
