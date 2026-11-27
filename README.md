@@ -8,7 +8,7 @@ Offline-first CLI tool for Class 11 NCERT lookup, formula/page search, doubt sol
 https://github.com/user-attachments/assets/e7e6bb47-f06e-4f31-8c75-cd8203654db1
 
 
-This is the exact code for terminal to run it on any new device after downloading it to the Downloads folder:
+## Following is the exact code for terminal to run it on any new device after downloading it to the Downloads folder:
 
 sudo apt update
 
