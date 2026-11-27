@@ -1,8 +1,8 @@
 # Gyan Yantra — 11th-Grade NCERT Doubt Solver & Formula Finder
 
-![Platform](https://shields.io)
-![Python](https://shields.io)
-![Offline](https://shields.io)
+![Platform](https://img.shields.io/badge/Platform-GNU%2FLinux-blue)
+![Python](https://img.shields.io/badge/Python-3.x-yellow)
+![Offline](https://img.shields.io/badge/Mode-100%25%20Offline-brightgreen)
 
 **Gyan Yantra** is an offline-first CLI workbench for Class 11 NCERT textbooks. It combines instant formula/topic search, doubt solving, and direct PDF page jumping via `zathura`—designed for keyboard-driven workflows like `i3wm`.
 
