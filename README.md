@@ -36,7 +36,7 @@ chmod +x run.sh
 
 | Key | Action |
 | :--- | :--- |
-| `↑` / `↓` | Move selection |
+| `k` / `j` | Move selection |
 | `/` | Jump search |
 | `Enter` | Open selected chapter or PDF page |
 | `q` / `Esc` | Go back or exit |
