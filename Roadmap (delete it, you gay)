@@ -1,1 +1,260 @@
+========================================
+MASTER PROJECT SUMMARY
+& TEAM PROMPTS
+Project: Offline-First
+11th-Grade NCERT Doubt
+Solver & Formula/Page Finder
+Repo:
+https://github.com/dot-bhavesh/Project.git
+========================================
 
+1. PROJECT OVERVIEW
+----------------------------------------
+- Status: Brand-new project.
+  Empty GitHub repo.
+  Zero code written yet.
+  Fresh directory setup.
+- Hardware & OS:
+  Lenovo B560
+  (1st-Gen Core i3 M370
+  @ 2.40GHz, 6GB DDR3 RAM,
+  AC-powered / no battery).
+  Linux Mint + i3wm +
+  xfce4-terminal.
+- Core Goal:
+  100% offline search of
+  11th NCERT PDFs.
+  Find exact page numbers
+  and formulas in ms.
+  Open PDF at exact page
+  in split i3wm window.
+  Optional Gemini API mode
+  for step-by-step doubts
+  strictly from NCERT text.
+
+2. BLUEPRINT & DB CONTRACT
+----------------------------------------
+- Folder: ~/Project/
+  - ncert_books/ -> Local
+    11th NCERT PDFs
+    (in .gitignore)
+  - indexer.py -> Teammate 1:
+    PDFs to SQLite DB
+  - search_engine.py ->
+    Teammate 2: Offline FTS5
+    search & snippets
+  - viewer.py -> Bhavesh:
+    Split i3wm & open PDF
+    at exact page
+  - solver.py -> Teammate 3:
+    Hybrid Gemini API solver
+  - main.py -> Teammate 3:
+    Rich Terminal UI
+  - .env -> GEMINI_API_KEY
+    (in .gitignore)
+- DB File: ncert.db
+  (SQLite3 + FTS5)
+- FTS5 Table: pages
+- Columns: subject, book_name,
+  pdf_filename, page_num,
+  content
+
+
+========================================
+PROMPT 1: FOR BHAVESH
+(Repo Setup + i3wm Split-Screen PDF
+Launcher - viewer.py)
+Copy and paste everything below
+into Gemini:
+========================================
+
+Context: I am an 11th-grade student
+starting a brand-new school science
+exhibition project from scratch with
+my teammates. We only have an empty
+GitHub repository
+(https://github.com/dot-bhavesh/Project.git)
+right now—no files or code exist yet.
+
+Project: An Offline-First 11th-Grade
+NCERT Doubt Solver & Formula/Page
+Finder running on my custom Linux Mint
++ i3wm setup (xfce4-terminal, Lenovo
+B560, 6GB RAM, no battery/AC-powered).
+
+My Role:
+1. Initialize the empty repository
+skeleton (main.py, indexer.py,
+search_engine.py, viewer.py, solver.py,
+ncert_books/, README.md, and .gitignore
+ignoring ncert_books/, *.pdf, *.db,
+.env, venv/, __pycache__/).
+2. Build Phase 3 (viewer.py), which
+takes a PDF filename and page number
+from our search engine, splits my i3wm
+workspace horizontally (i3-msg split h),
+and launches zathura directly at that
+exact page (zathura -P <page_num> <pdf_path>)
+alongside my terminal without blocking
+Python.
+
+Task: Give me the exact bash commands
+to initialize and push the repo
+skeleton from xfce4-terminal, the apt
+command to install zathura, and the
+complete viewer.py code with clean
+error handling and a quick test block.
+
+
+========================================
+PROMPT 2: FOR TEAMMATE 1
+(Data & PDF Indexer - indexer.py)
+Copy and paste everything below
+into Gemini:
+========================================
+
+Context: We are an 11th-grade team
+starting a brand-new Offline-First
+NCERT Doubt Solver & Formula/Page
+Finder in Python for a school science
+exhibition. No code has been written
+yet. The app will run on a low-RAM
+Linux laptop (6GB RAM).
+
+My Role: I am starting from scratch on
+Phase 1 (indexer.py). My job is to take
+11th-grade NCERT textbook PDFs placed
+inside a local ncert_books/ folder and
+convert them into an ultra-fast offline
+SQLite database (ncert.db) using
+SQLite's built-in FTS5 (Full-Text
+Search) engine.
+
+Agreed Database Schema (Must match
+teammates' code):
+- Database file: ncert.db
+- Virtual FTS5 table: pages with
+  columns: subject, book_name,
+  pdf_filename, page_num, content
+
+Task: Walk me through setting up a
+Python virtual environment, installing
+PyMuPDF (fitz), and writing the
+complete indexer.py script from
+scratch. It should read all PDFs in
+ncert_books/, extract text
+page-by-page (starting page numbering
+at 1), clean extra whitespace, populate
+ncert.db, and print progress. Also
+show me how to test ncert.db with a
+quick sample query.
+
+
+========================================
+PROMPT 3: FOR TEAMMATE 2
+(Offline Search & Formula Finder -
+search_engine.py)
+Copy and paste everything below
+into Gemini:
+========================================
+
+Context: We are an 11th-grade team
+starting a brand-new Offline-First
+NCERT Doubt Solver & Formula/Page
+Finder in Python for a school science
+exhibition. No code has been written
+yet.
+
+Teammate 1 is building indexer.py to
+create a SQLite FTS5 database
+(ncert.db) with a virtual table named
+pages containing columns: subject,
+book_name, pdf_filename, page_num, and
+content.
+
+My Role: I am starting from scratch on
+Phase 2 (search_engine.py)—the
+offline search engine that finds exact
+NCERT page numbers, chapter topics, and
+formula mentions in milliseconds
+without internet.
+
+Task: Write the complete
+search_engine.py module from scratch
+with a function
+search_ncert(query, subject=None, limit=5)
+using SQLite FTS5 MATCH and bm25()
+ranking. Make sure it sanitizes user
+input so special characters (like ?,
++, =, -) don't crash SQLite FTS5
+queries, extracts a short preview
+snippet around the match, and returns
+a list of dictionaries with keys:
+subject, book_name, pdf_filename,
+page_num, snippet, and full_content.
+Include a self-contained
+if __name__ == "__main__": test block
+that creates a temporary dummy ncert.db
+so I can test my code immediately
+before Teammate 1 finishes.
+
+
+========================================
+PROMPT 4: FOR TEAMMATE 3
+(Hybrid Gemini Solver & Terminal UI -
+solver.py + main.py)
+Copy and paste everything below
+into Gemini:
+========================================
+
+Context: We are an 11th-grade team
+starting a brand-new Offline-First
+NCERT Doubt Solver & Formula/Page
+Finder in Python for a school science
+exhibition, running in xfce4-terminal
+on Linux Mint (i3wm, 6GB RAM). No code
+has been written yet.
+
+Our team's modules will follow these
+exact function signatures:
+- search_engine.py provides
+  search_ncert(query, subject=None, limit=5)
+  returning a list of dicts:
+  {'subject', 'book_name', 'pdf_filename', 'page_num', 'snippet', 'full_content'}.
+- viewer.py provides
+  open_pdf_page(pdf_path, page_num)
+  which opens ncert_books/<pdf_filename>
+  at that exact page in a split i3wm
+  window.
+
+My Role: I am starting from scratch on
+Phase 4 (solver.py and main.py)—the
+Hybrid AI Doubt Solver and the
+Terminal User Interface.
+
+Task:
+1. Write solver.py from scratch using
+the official google-genai Python SDK
+(gemini-2.5-flash) and python-dotenv
+(loading GEMINI_API_KEY from .env).
+Given a user's question and the top
+retrieved NCERT page text
+(full_content, book_name, page_num),
+instruct Gemini to solve/explain
+strictly within the 11th-grade NCERT
+syllabus and cite the exact page
+number. Handle offline/no-internet
+errors gracefully by returning a
+clean fallback message.
+2. Write main.py from scratch using the
+rich library to create a clean
+terminal dashboard where a student
+enters a doubt or formula, views top
+offline NCERT page matches in a
+formatted table, opens the exact PDF
+page via open_pdf_page(), and
+optionally requests a step-by-step
+Gemini explanation. Include dummy mock
+functions if search_engine.py or
+viewer.py are still empty so I can run
+and test the UI immediately.
