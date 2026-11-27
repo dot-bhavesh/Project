@@ -1,0 +1,86 @@
+from __future__ import annotations
+import os, re, sqlite3
+from typing import Any
+from search_engine import DEFAULT_DB_PATH, _sanitize_fts_query, search_ncert
+_PUA = re.compile(r"[\uE000-\uF8FF\U000F0000-\U000FFFFD\U00100000-\U0010FFFD]")
+_SENT = re.compile(r"(?<=[.!?])\s+")
+_WORD = re.compile(r"[A-Za-z0-9_]+")
+_FORM = re.compile(r"(=|sin|cos|tan|log|lim|d/dt|d/dx|\^|mol|kg|m/s|N\b|J\b|W\b)")
+_STOP = {"a","an","and","are","as","at","be","by","for","from","how","in","into","is","it","of","on","or","that","the","this","to","what","when","where","which","with"}
+def clean_ncert_text(text: str) -> str:
+    if not text:
+        return ""
+    return " ".join(_PUA.sub(" ", text).split())
+def _search_any_keyword(query: str, subject: str | None, limit: int, db_path: str) -> list[dict[str, Any]]:
+    if limit <= 0 or not os.path.exists(db_path):
+        return []
+    toks = [t for t in _WORD.findall(query) if len(t) > 1 and t.lower() not in _STOP]
+    or_expr = " OR ".join(f"\"{t}\"" for t in toks) if toks else _sanitize_fts_query(query).replace(" ", " OR ")
+    if not or_expr:
+        return []
+    sql = "SELECT subject, book_name, pdf_filename, page_num, snippet(pages, 4, '[', ']', '...', 14) AS snippet, content AS full_content FROM pages WHERE pages MATCH ?"
+    params: list[Any] = [or_expr]
+    if subject and subject.strip():
+        sql += " AND subject = ? COLLATE NOCASE"
+        params.append(subject.strip())
+    sql += " ORDER BY bm25(pages) ASC LIMIT ?"
+    params.append(limit)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+    return [{"subject": r["subject"], "book_name": r["book_name"], "pdf_filename": r["pdf_filename"], "page_num": r["page_num"], "snippet": r["snippet"], "full_content": r["full_content"]} for r in rows]
+def _extract_key_sentences(text: str, query: str, max_sentences: int = 4) -> list[str]:
+    cleaned = clean_ncert_text(text)
+    if not cleaned:
+        return []
+    qtoks = {t.lower() for t in _WORD.findall(query) if len(t) > 1 and t.lower() not in _STOP}
+    sents = _SENT.split(cleaned)
+    scored = []
+    for i, s in enumerate(sents):
+        sc = s.strip()
+        if len(sc) < 12:
+            continue
+        ov = len(qtoks & {t.lower() for t in _WORD.findall(sc)})
+        fb = 1 if _FORM.search(sc) else 0
+        if ov * 3 + fb > 0:
+            scored.append((ov * 3 + fb, -i, sc))
+    scored.sort(reverse=True)
+    sel = [s for _, _, s in scored[:max_sentences]]
+    return sel if sel else [s.strip() for s in sents[:2] if len(s.strip()) >= 12]
+def _extract_formula_lines(sentences: list[str], max_items: int = 3) -> list[str]:
+    out = []
+    for s in sentences:
+        if len(s) <= 190 and ("=" in s or re.search(r"(\^|sin|cos|tan|log|lim|d/dt|d/dx)", s, re.I)):
+            out.append(s)
+        if len(out) >= max_items:
+            break
+    return out
+def solve_doubt(question: str, subject: str | None = None, limit: int = 3, db_path: str = str(DEFAULT_DB_PATH)) -> dict[str, Any]:
+    q = (question or "").strip()
+    if not q:
+        return {"question": question, "found": False, "summary": "Please enter a topic, formula, or doubt.", "formulas": [], "primary_source": None, "references": []}
+    matches = search_ncert(query=q, subject=subject, limit=limit, db_path=db_path)
+    if not matches:
+        kw = " ".join(t for t in _WORD.findall(q) if t.lower() not in _STOP)
+        if kw and kw.lower() != q.lower():
+            matches = search_ncert(query=kw, subject=subject, limit=limit, db_path=db_path)
+    if not matches:
+        matches = _search_any_keyword(query=q, subject=subject, limit=limit, db_path=db_path)
+    if not matches:
+        return {"question": q, "found": False, "summary": f"No matching NCERT pages found for '{q}'.", "formulas": [], "primary_source": None, "references": []}
+    refs, all_ks = [], []
+    for m in matches:
+        cf = clean_ncert_text(m.get("full_content", ""))
+        cs = clean_ncert_text(m.get("snippet", ""))
+        ks_list = _extract_key_sentences(cf, q, max_sentences=3)
+        for ks in ks_list:
+            if ks not in all_ks:
+                all_ks.append(ks)
+        refs.append({"subject": m["subject"], "book_name": m["book_name"], "pdf_filename": m["pdf_filename"], "page_num": m["page_num"], "snippet": cs, "key_points": ks_list})
+    summary = " ".join(all_ks[:4]) if all_ks else refs[0]["snippet"]
+    formulas = _extract_formula_lines(all_ks, max_items=3)
+    top = refs[0]
+    return {"question": q, "found": True, "summary": summary, "formulas": formulas, "primary_source": {"subject": top["subject"], "book_name": top["book_name"], "pdf_filename": top["pdf_filename"], "page_num": top["page_num"]}, "references": refs}

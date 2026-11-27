@@ -1,0 +1,176 @@
+from __future__ import annotations
+from solver import format_pdf_display_name
+import argparse, sqlite3, sys, textwrap
+from pathlib import Path
+from typing import Any
+from search_engine import DEFAULT_DB_PATH
+from menu import run_yazi_menu
+from solver import solve_doubt
+from viewer import DEFAULT_BOOKS_DIR, ViewerError, open_pdf_page
+BANNER = [
+    r" _  _  ___ ___ ___ _____   ___   ___  _  _ ___ _____",
+    r"| \| |/ __| __| _ \_   _| |   \ / _ \| || | _ )_   _|",
+    r"| .` | (__| _||   / | |   | |) | (_) | || | _ \ | |  ",
+    r"|_|\_|\___|___|_|_\ |_|   |___/ \___/ \__/|___/ |_|  ",
+]
+class Colors:
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled = enabled and sys.stdout.isatty()
+    def _w(self, code: str, text: str) -> str:
+        return f"\033[{code}m{text}\033[0m" if self.enabled else text
+    def bold(self, t: str) -> str: return self._w("1", t)
+    def cyan(self, t: str) -> str: return self._w("36", t)
+    def green(self, t: str) -> str: return self._w("32", t)
+    def yellow(self, t: str) -> str: return self._w("33", t)
+    def red(self, t: str) -> str: return self._w("31", t)
+    def dim(self, t: str) -> str: return self._w("2", t)
+def _clear_screen() -> None:
+    if sys.stdout.isatty():
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+def _print_banner(c: Colors, subject: str | None, db_path: Path, auto_open: bool) -> None:
+    print(c.cyan("\n".join(BANNER)))
+    print(c.bold("  Offline NCERT Doubt Solver & Formula Finder") + c.dim(" [Class 11 Exhibition]"))
+    print(c.dim(f"  DB: {db_path.name} | Subject: {subject or 'All'} | Auto-Open: {'ON' if auto_open else 'OFF'}"))
+    print(c.cyan("-" * 70))
+    print("  Commands: " + c.bold(":open <n>") + " | " + c.bold(":s <Subj|all>") + " | " + c.bold(":books") + " | " + c.bold(":clear") + " | " + c.bold(":q"))
+def _print_books_summary(db_path: Path, c: Colors) -> None:
+    if not db_path.exists():
+        print(c.red(f"[error] Database '{db_path}' not found. Run indexer.py first."))
+        return
+    conn = sqlite3.connect(str(db_path))
+    try:
+        rows = conn.execute("SELECT subject, book_name, pdf_filename, COUNT(*) FROM pages GROUP BY subject, book_name, pdf_filename ORDER BY subject, book_name, pdf_filename").fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        print(c.yellow("[info] No indexed pages found. Run indexer.py first."))
+        return
+    print("\n" + c.bold("Indexed NCERT Books:"))
+    for subj, book, fname, cnt in rows:
+        print(f"  • [{c.green(subj)}] {book} — {c.cyan(fname)} ({cnt} pages)")
+def _open_result_in_viewer(pdf_filename: str, page_num: int, books_dir: Path, c: Colors) -> None:
+    try:
+        proc = open_pdf_page(pdf_filename=pdf_filename, page_num=int(page_num), books_dir=books_dir, split_horizontal=True)
+        print(c.green(f"[viewer] {pdf_filename} p.{page_num} (PID {proc.pid})"))
+    except ViewerError as exc:
+        print(c.red(f"[viewer error] {exc}"))
+def _print_solution(result: dict[str, Any], c: Colors) -> None:
+    print("\n" + c.cyan("-" * 70))
+    if not result.get("found"):
+        print(c.yellow(result.get("summary", "No match found.")))
+        print(c.cyan("-" * 70))
+        return
+    print(c.bold("Summary:"))
+    print(textwrap.fill(result["summary"], width=66, initial_indent="  ", subsequent_indent="  "))
+    if result.get("formulas"):
+        print("\n" + c.bold("Key Formulas / Equations:"))
+        for line in result["formulas"]:
+            w = textwrap.fill(line, width=64, initial_indent="    ", subsequent_indent="    ")
+            print(c.green("  •") + w[3:])
+    refs = result.get("references", [])
+    if refs:
+        print("\n" + c.bold("Matched Pages (:open <num>):"))
+        for idx, ref in enumerate(refs, start=1):
+            print(f"  [{idx}] {c.cyan(format_pdf_display_name(ref.get("pdf_filename") or ref.get("filename") or ref.get("pdf") or "", ref.get("book_name") or ""))} p.{c.bold(str(ref['page_num']))} {c.dim('(' + ref['subject'] + ' / ' + ref['book_name'] + ')')}")
+            if ref.get("snippet"):
+                print(c.dim(textwrap.fill(ref["snippet"], width=62, initial_indent="      ", subsequent_indent="      ")))
+    print(c.cyan("-" * 70))
+def run_cli(db_path: Path = DEFAULT_DB_PATH, books_dir: Path = DEFAULT_BOOKS_DIR, default_subject: str | None = None, auto_open: bool = True, limit: int = 3, no_color: bool = False) -> None:
+    c = Colors(enabled=not no_color)
+    active_subject = default_subject
+    last_refs: list[dict[str, Any]] = []
+    _clear_screen()
+    if not db_path.exists():
+        print(c.yellow(f"[warning] '{db_path}' not found. Run ./venv/bin/python indexer.py first."))
+    _print_banner(c, active_subject, db_path, auto_open)
+    while True:
+        subj_label = active_subject if active_subject else "All"
+        try:
+            raw = input(f"\n{c.bold(c.cyan('NCERT'))} [{c.yellow(subj_label)}]> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting.")
+            break
+        if not raw: continue
+        lower = raw.lower()
+        if lower in {":q", ":quit", "exit", "quit"}:
+            print("Exiting."); break
+        if lower in {":menu", "m"}:
+            picked = run_yazi_menu(db_path=db_path, books_dir=books_dir, initial_subject=active_subject)
+            _clear_screen()
+            _print_banner(c, active_subject, db_path, auto_open)
+            if picked and picked.get("action") == "doubt":
+                q_text = picked["question"]
+                active_subject = picked.get("subject") or active_subject
+                try:
+                    result = solve_doubt(question=q_text, subject=active_subject, limit=limit, db_path=str(db_path))
+                except (FileNotFoundError, sqlite3.Error) as exc:
+                    print(c.red(f"[error] {exc}"))
+                    continue
+                last_refs = result.get("references", [])
+                _print_solution(result, c)
+                primary = result.get("primary_source")
+                if auto_open and primary:
+                    _open_result_in_viewer(primary["pdf_filename"], primary["page_num"], books_dir, c)
+            continue
+        if lower in {":clear", "clear"}:
+            _clear_screen(); _print_banner(c, active_subject, db_path, auto_open); continue
+        if lower in {":h", ":help", "help"}:
+            _print_banner(c, active_subject, db_path, auto_open); continue
+        if lower in {":books", ":ls"}:
+            _print_books_summary(db_path, c); continue
+        if lower.startswith(":s"):
+            parts = raw.split(maxsplit=1)
+            if len(parts) == 1 or parts[1].strip().lower() in {"all", "clear", "none", "*"}:
+                active_subject = None; print(c.yellow("[filter] All subjects."))
+            else:
+                active_subject = parts[1].strip(); print(c.green(f"[filter] Subject: {active_subject}"))
+            continue
+        if lower.startswith(":open"):
+            parts = raw.split()
+            if len(parts) != 2 or not parts[1].isdigit():
+                print(c.yellow("[usage] :open <num>")); continue
+            idx = int(parts[1])
+            if not last_refs:
+                print(c.yellow("[info] Run a query first.")); continue
+            if 1 <= idx <= len(last_refs):
+                chosen = last_refs[idx - 1]
+                _open_result_in_viewer(chosen["pdf_filename"], chosen["page_num"], books_dir, c)
+            else:
+                print(c.yellow(f"[info] Choose 1..{len(last_refs)}."))
+            continue
+        try:
+            result = solve_doubt(question=raw, subject=active_subject, limit=limit, db_path=str(db_path))
+        except FileNotFoundError:
+            print(c.red(f"[error] DB not found at '{db_path}'.")); continue
+        except sqlite3.Error as exc:
+            print(c.red(f"[db error] {exc}")); continue
+        last_refs = result.get("references", [])
+        _print_solution(result, c)
+        primary = result.get("primary_source")
+        if auto_open and primary:
+            _open_result_in_viewer(primary["pdf_filename"], primary["page_num"], books_dir, c)
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Offline NCERT Doubt Solver & Formula Finder")
+    p.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH)
+    p.add_argument("--books-dir", type=Path, default=DEFAULT_BOOKS_DIR)
+    p.add_argument("--subject", type=str, default=None)
+    p.add_argument("--no-auto-open", action="store_true")
+    p.add_argument("--no-color", action="store_true")
+    p.add_argument("--limit", type=int, default=3)
+    p.add_argument("--menu", action="store_true", help="Launch Yazi-style subject/chapter menu immediately")
+    return p.parse_args()
+if __name__ == "__main__":
+    args = _parse_args()
+    try:
+        if args.menu:
+            _clear_screen()
+            picked = run_yazi_menu(args.db_path, args.books_dir, args.subject)
+            if picked and picked.get("action") == "doubt":
+                res = solve_doubt(picked["question"], subject=picked.get("subject") or args.subject, limit=args.limit, db_path=str(args.db_path))
+                _print_solution(res, Colors(enabled=not args.no_color))
+                if not args.no_auto_open and res.get("primary_source"):
+                    _open_result_in_viewer(res["primary_source"]["pdf_filename"], res["primary_source"]["page_num"], args.books_dir, Colors(enabled=not args.no_color))
+        run_cli(args.db_path, args.books_dir, args.subject, not args.no_auto_open, args.limit, args.no_color)
+    except Exception as exc:
+        print(f"[fatal] {exc}"); sys.exit(1)
