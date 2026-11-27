@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-cd /home/bhavesh/Project
+cd "$(dirname "$(realpath "$0")")"
 if [ "${1:-}" = "--cli" ]; then
   shift
   exec ./venv/bin/python main.py "$@"
