@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/e7e6bb47-f06e-4f31-8c75-cd8203654db1
 sudo apt update
 sudo apt install -y git python3 python3-venv zathura zathura-pdf-poppler
 git clone https://github.com/dot-bhavesh/Project.git
-cd <repo-name>
+cd Project
 python3 -m venv venv
 chmod +x run.sh
 ./run.sh
